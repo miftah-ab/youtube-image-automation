@@ -1,0 +1,29 @@
+# Global Application Settings
+
+storage:
+  mode: "local" # Options: "local", "gdrive"
+  local_path: "output"
+  gdrive_path: "G:\\My Drive\\YouTube-Automation"
+  allow_missing_drive_fallback: true
+
+browser:
+  headless: false
+  slow_mo_ms: 50
+  timeout_ms: 45000
+  gemini_url: "https://gemini.google.com/app"
+  profile_dir: "data/browser_profile"
+  viewport:
+    width: 1280
+    height: 900
+
+automation:
+  max_retries: 3
+  backoff_base_seconds: 5
+  backoff_max_seconds: 120
+  inter_prompt_delay_seconds: 3
+  rate_limit_pause_minutes: 60
+
+notion:
+  api_version: "2022-06-28"
+  timeout_seconds: 30
+  retry_count: 3

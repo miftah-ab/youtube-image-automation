@@ -1,0 +1,58 @@
+channels:
+  ninety_sense:
+    id: "ninety_sense"
+    name: "Ninety Sense"
+    theme: "Psychology and Human Behavior"
+    description: "Deep psychological insights, behavior patterns, cognitive bias visualizations."
+    output_subfolder: "Ninety-Sense"
+    filename_pattern: "image-{index:03d}.{ext}" # e.g., image-001.png
+    
+    requires_reference: false
+    reference_images:
+      - "assets/references/ninety_sense_style.png"
+    
+    visual_instructions: "Cinematic psychological documentary style, moody ambient lighting, subtle film grain, thoughtful human expression, 16:9 aspect ratio."
+    apply_visual_instructions_mode: "append_if_missing"
+    
+    notion:
+      prompt_section_heading: "Prompts"
+      prompt_pattern: "^(?:IMAGE|PROMPT|Image|Prompt)\\s*0*(\\d+)[:.]?\\s*(.*)"
+
+  case_xyz:
+    id: "case_xyz"
+    name: "Case XYZ"
+    theme: "Case-Based Storytelling"
+    description: "Investigative cases, mysteries, documentary reconstructions, dramatic scenes."
+    output_subfolder: "Case-XYZ"
+    filename_pattern: "image-{index:03d}.{ext}"
+    
+    requires_reference: false
+    reference_images:
+      - "assets/references/case_xyz_style.png"
+    
+    visual_instructions: "Gritty investigative journalism documentary aesthetic, dramatic shadows, realistic textures, cinematic color grading, 16:9 aspect ratio."
+    apply_visual_instructions_mode: "append_if_missing"
+    
+    notion:
+      prompt_section_heading: "Prompts"
+      prompt_pattern: "^(?:IMAGE|PROMPT|Image|Prompt)\\s*0*(\\d+)[:.]?\\s*(.*)"
+
+  american_wallet:
+    id: "american_wallet"
+    name: "American Wallet"
+    theme: "American Personal Finance"
+    description: "60-shot visual plans, personal finance, COLA calculations, Deep Navy & Warm Ivory editorial aesthetic."
+    output_subfolder: "American-Wallet"
+    filename_pattern: "image-{index:03d}.{ext}" # e.g., image-001.png
+    
+    # American Wallet uses an approved character reference image for all human/hand motions
+    requires_reference: true
+    reference_images:
+      - "assets/references/american_wallet_character.png"
+    
+    visual_instructions: "Deep Navy #14263D and Warm Ivory #F5F1E8, tactile paper and ink texture, controlled natural light, 16:9 aspect ratio."
+    apply_visual_instructions_mode: "append_if_missing"
+    
+    notion:
+      prompt_section_heading: "Visual Plan"
+      prompt_pattern: "(?i)Ready-to-paste image prompt\\s*[:.\\-]?\\s*(.*)"

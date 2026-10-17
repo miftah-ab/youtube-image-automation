@@ -302,7 +302,8 @@ def main():
                         st.error(f"Failed to create job: {e}")
 
             with col_dest:
-                st.caption(f"Destination: `{drive_sync.get_active_root_path() / active_channel.output_subfolder / st.session_state.get('video_title', 'Video')}`")
+                dest_path = drive_sync.get_active_local_root() / active_channel.output_subfolder / st.session_state.get('video_title', 'Video')
+                st.caption(f"Destination: `{dest_path}`")
 
     # ----------------------------------------------------
     # TAB 2: JOB CONTROL & LIVE PROGRESS

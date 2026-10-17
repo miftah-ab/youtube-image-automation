@@ -56,6 +56,8 @@ class DriveSyncManager:
             return self.local_path
         return self.local_path
 
+    get_active_root_path = get_active_local_root
+
     def inspect_storage(self) -> StorageStatus:
         target = self.get_active_local_root()
         path_str = str(target)

@@ -74,7 +74,10 @@ class ChannelConfig(BaseModel):
 
 class ChannelRegistry:
     def __init__(self, config_path: Optional[Path] = None):
-        self.config_path = config_path or Path("config/channels.yaml")
+        if config_path:
+            self.config_path = Path(config_path)
+        else:
+            self.config_path = Path(__file__).resolve().parent.parent / "config" / "channels.yaml"
         self.channels: Dict[str, ChannelConfig] = {}
         self.load()
 

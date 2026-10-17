@@ -118,8 +118,17 @@ class GeminiBrowserAdapter:
         except ImportError:
             raise ImportError("Playwright is not installed. Install via: pip install playwright && playwright install chromium")
 
-        if self._page is not None:
+        if self._page is not None and self._context is not None:
             return
+
+        # Clean up any stale lockfiles from previous crashes
+        for lock_name in ("lockfile", "SingletonLock", "SingletonSocket", "SingletonCookie"):
+            lock_path = self.profile_dir / lock_name
+            if lock_path.exists():
+                try:
+                    lock_path.unlink()
+                except Exception:
+                    pass
 
         logger.info(f"Launching persistent browser context from {self.profile_dir}...")
         self._playwright = sync_playwright().start()
@@ -130,7 +139,7 @@ class GeminiBrowserAdapter:
             "--no-default-browser-check",
         ]
 
-        kwargs: Dict[str, Any] = {
+        base_kwargs: Dict[str, Any] = {
             "user_data_dir": str(self.profile_dir.resolve()),
             "headless": self.headless,
             "slow_mo": self.slow_mo_ms,
@@ -138,23 +147,33 @@ class GeminiBrowserAdapter:
             "args": launch_args,
         }
 
-        # Check standard Google Chrome installation path on Windows
-        standard_chrome = Path("C:/Program Files/Google/Chrome/Application/chrome.exe")
-        if self.chrome_executable_path and Path(self.chrome_executable_path).exists():
-            kwargs["executable_path"] = self.chrome_executable_path
-        elif standard_chrome.exists():
-            kwargs["executable_path"] = str(standard_chrome)
-        else:
-            kwargs["channel"] = "chrome"
+        # Multi-browser fallback priority: Edge -> Chrome -> bundled Chromium
+        edge_path = Path("C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe")
+        chrome_path = Path("C:/Program Files/Google/Chrome/Application/chrome.exe")
 
-        try:
-            self._context = self._playwright.chromium.launch_persistent_context(**kwargs)
-        except Exception as e:
-            # Fallback to default bundled chromium if specific chrome launch failed
-            logger.warning(f"Could not launch system Chrome ({e}), falling back to default Playwright chromium...")
-            kwargs.pop("executable_path", None)
-            kwargs.pop("channel", None)
-            self._context = self._playwright.chromium.launch_persistent_context(**kwargs)
+        candidates: List[Dict[str, Any]] = []
+        if self.chrome_executable_path and Path(self.chrome_executable_path).exists():
+            candidates.append({"executable_path": self.chrome_executable_path})
+        if edge_path.exists():
+            candidates.append({"channel": "msedge"})
+        if chrome_path.exists():
+            candidates.append({"channel": "chrome"})
+        candidates.append({})  # Fallback to default bundled chromium
+
+        launched = False
+        last_error = None
+        for candidate in candidates:
+            attempt_kwargs = {**base_kwargs, **candidate}
+            try:
+                self._context = self._playwright.chromium.launch_persistent_context(**attempt_kwargs)
+                launched = True
+                break
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Could not launch browser with {candidate}: {e}")
+
+        if not launched:
+            raise RuntimeError(f"Failed to launch browser: {last_error}")
 
         pages = self._context.pages
         self._page = pages[0] if pages else self._context.new_page()
@@ -166,35 +185,43 @@ class GeminiBrowserAdapter:
     def navigate_to_gemini(self) -> None:
         if not self._page:
             return
-        curr_url = self._page.url
-        if "gemini.google.com" not in curr_url:
-            logger.info(f"Navigating to {self.gemini_url}...")
-            self._page.goto(self.gemini_url, wait_until="domcontentloaded")
-            time.sleep(2)
+        try:
+            curr_url = self._page.url
+            if "gemini.google.com" not in curr_url:
+                logger.info(f"Navigating to {self.gemini_url}...")
+                self._page.goto(self.gemini_url, wait_until="domcontentloaded")
+                time.sleep(2)
+        except Exception as e:
+            logger.warning(f"Error navigating to Gemini: {e}")
 
     def check_auth_status(self) -> Tuple[bool, str]:
         """Inspects whether the current page is authenticated or requires manual login."""
         if not self._page:
             return False, "Browser is not running."
 
-        curr_url = self._page.url.lower()
+        try:
+            curr_url = self._page.url.lower()
 
-        # Check for Google sign-in redirect
-        if "accounts.google.com" in curr_url:
-            return False, "Google Sign-In page detected. Manual authentication required."
+            # Check for Google sign-in redirect
+            if "accounts.google.com" in curr_url:
+                return False, "Google Sign-In page detected. Manual authentication required."
 
-        # Check for sign-in buttons on Gemini landing
-        sign_in_elements = self._page.query_selector_all("a[href*='accounts.google.com'], button:has-text('Sign in')")
-        if sign_in_elements:
-            return False, "Gemini 'Sign in' prompt visible. Please log in through the open browser."
+            # Check for sign-in buttons on Gemini landing
+            sign_in_elements = self._page.query_selector_all("a[href*='accounts.google.com'], button:has-text('Sign in')")
+            if sign_in_elements:
+                return False, "Gemini 'Sign in' prompt visible. Please log in through the open browser."
 
-        # Check if the prompt input or chat interface is visible
-        for sel in self.PROMPT_INPUT_SELECTORS:
-            if self._page.query_selector(sel):
-                return True, "Authenticated and ready."
+            # Check if the prompt input or chat interface is visible
+            for sel in self.PROMPT_INPUT_SELECTORS:
+                if self._page.query_selector(sel):
+                    return True, "Authenticated and ready."
 
-        # If still loading or uncertain
-        return False, "Waiting for Gemini interface to load or manual authentication."
+            # If still loading or uncertain
+            return False, "Waiting for Gemini interface to load or manual authentication."
+        except Exception as e:
+            logger.warning(f"Exception during check_auth_status: {e}")
+            return False, f"Authentication check pending: {e}"
+
 
     def new_conversation(self) -> bool:
         """Starts a fresh conversation in Gemini to keep prompt context clean."""

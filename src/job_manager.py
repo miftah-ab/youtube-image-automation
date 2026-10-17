@@ -88,8 +88,16 @@ class JobManager:
     def start_job(self, job_id: str) -> bool:
         """Starts processing a job in a background worker thread."""
         with self._state_lock:
+            if self.state.is_running and self.state.is_paused and self.state.current_job_id == job_id:
+                logger.info(f"Job {job_id} is currently paused. Resuming worker execution...")
+                self._pause_event.clear()
+                self.state.is_paused = False
+                self.state.status_message = "Resumed job execution."
+                self.store.set_job_status(job_id, JobStatus.RUNNING)
+                return True
+
             if self.state.is_running:
-                logger.warning("Worker is already running a job.")
+                logger.warning(f"Worker is already running job {self.state.current_job_id}.")
                 return False
 
             job = self.store.get_job(job_id)

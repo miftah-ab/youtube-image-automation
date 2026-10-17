@@ -143,7 +143,14 @@ def main():
     if browser_profile.exists() and any(browser_profile.iterdir()):
         st.sidebar.info("Gemini Profile: Initialized")
     else:
-        st.sidebar.caption("Gemini Profile: Empty (Sign-in on first run)")
+        st.sidebar.caption("Gemini Profile: Needs Google Login")
+
+    if st.sidebar.button("🌐 Open Browser to Login to Gemini", help="Opens the Gemini browser so you can log into your Google account."):
+        try:
+            job_mgr.browser_adapter.launch()
+            st.sidebar.success("Browser window opened! Sign in to Google, then run your job.")
+        except Exception as e:
+            st.sidebar.error(f"Failed to open browser: {e}")
 
     # --- MAIN VIEW TABS ---
     tab_select, tab_control, tab_diagnostics = st.tabs([
@@ -372,38 +379,63 @@ def main():
             worker_state = job_mgr.state
 
             with c1:
-                start_disabled = worker_state.is_running or job_data["status"] == JobStatus.COMPLETED
-                if st.button("Start / Run Job", disabled=start_disabled, type="primary"):
-                    job_mgr.start_job(active_job_id)
+                start_disabled = (worker_state.is_running and not worker_state.is_paused) or job_data["status"] == JobStatus.COMPLETED
+                btn_label = "▶️ Resume Job" if worker_state.is_paused else "🚀 Start / Run Job"
+                if st.button(btn_label, disabled=start_disabled, type="primary"):
+                    if worker_state.is_paused:
+                        job_mgr.resume_job()
+                        st.success("Resumed job execution.")
+                    else:
+                        started = job_mgr.start_job(active_job_id)
+                        if started:
+                            st.success(f"Job started: `{active_job_id}`.")
+                        else:
+                            st.warning(f"Could not start: {job_mgr.state.error_message or 'Worker is busy'}")
                     st.rerun()
 
             with c2:
                 pause_disabled = not worker_state.is_running or worker_state.is_paused
-                if st.button("Pause", disabled=pause_disabled):
+                if st.button("⏸️ Pause", disabled=pause_disabled):
                     job_mgr.pause_job()
                     st.rerun()
 
             with c3:
                 resume_disabled = not worker_state.is_paused
-                if st.button("Resume", disabled=resume_disabled):
+                if st.button("▶️ Resume", disabled=resume_disabled):
                     job_mgr.resume_job()
                     st.rerun()
 
             with c4:
                 stop_disabled = not worker_state.is_running
-                if st.button("Stop Safely", disabled=stop_disabled):
+                if st.button("⏹️ Stop Safely", disabled=stop_disabled):
                     job_mgr.stop_job()
                     st.rerun()
 
             with c5:
-                if st.button("Retry Failed Tasks"):
+                if st.button("🔄 Retry Failed Tasks"):
                     reset_count = recovery.reset_failed_tasks(active_job_id)
                     st.info(f"Reset {reset_count} failed tasks to PENDING.")
                     st.rerun()
 
-            # Worker Status Banner
+            # Worker Status & Action Banners
             st.divider()
-            if worker_state.is_running:
+            status_lower = (worker_state.status_message or "").lower()
+            if worker_state.is_paused and ("sign in" in status_lower or "action required" in status_lower or "auth" in status_lower):
+                st.error("🔑 **Google / Gemini Login Required**")
+                st.markdown("The automated browser opened Gemini, but you are not logged into a Google account yet. Sign in once so Gemini can generate images:")
+                col_auth1, col_auth2 = st.columns([1, 1])
+                with col_auth1:
+                    if st.button("🌐 Open / Show Gemini Window to Sign In", type="primary", key="tab2_auth_window_btn"):
+                        try:
+                            job_mgr.browser_adapter.launch()
+                            st.info("Browser window opened on your screen! Sign in to Google, then click Resume below.")
+                        except Exception as e:
+                            st.error(f"Failed to open browser: {e}")
+                with col_auth2:
+                    if st.button("✅ I have logged in, Resume Job", key="tab2_auth_resume_btn"):
+                        job_mgr.resume_job()
+                        st.rerun()
+            elif worker_state.is_running:
                 st.info(f"Worker Active: **{worker_state.status_message}**")
             elif worker_state.is_paused:
                 st.warning(f"Worker Paused: **{worker_state.status_message}**")
@@ -439,7 +471,12 @@ def main():
                     "Storage Status": t.get("cloud_sync_status") or "None",
                     "Last Error": t.get("last_error") or "",
                 })
-            st.dataframe(task_rows, use_container_width=True)
+            st.dataframe(task_rows, width="stretch")
+
+            # Live Auto-Refresh while background worker is running
+            if worker_state.is_running and not worker_state.is_paused:
+                time.sleep(2)
+                st.rerun()
 
     # ----------------------------------------------------
     # TAB 3: SYSTEM DIAGNOSTICS & RECOVERY

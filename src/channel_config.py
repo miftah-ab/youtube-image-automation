@@ -98,3 +98,30 @@ class ChannelRegistry:
 
     def list_all(self) -> List[ChannelConfig]:
         return list(self.channels.values())
+
+    def update_reference(self, channel_id: str, relative_path: str, requires_reference: bool = True) -> None:
+        """Updates channel reference image and persists back to channels config YAML."""
+        if not self.config_path.exists():
+            return
+        with open(self.config_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+
+        if "channels" in data and channel_id in data["channels"]:
+            data["channels"][channel_id]["requires_reference"] = requires_reference
+            data["channels"][channel_id]["reference_images"] = [relative_path]
+            with open(self.config_path, "w", encoding="utf-8") as f:
+                yaml.dump(data, f, sort_keys=False, default_flow_style=False)
+            self.load()
+
+    def set_requires_reference(self, channel_id: str, requires_reference: bool) -> None:
+        """Toggles whether the channel requires a reference image and persists to YAML."""
+        if not self.config_path.exists():
+            return
+        with open(self.config_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+
+        if "channels" in data and channel_id in data["channels"]:
+            data["channels"][channel_id]["requires_reference"] = requires_reference
+            with open(self.config_path, "w", encoding="utf-8") as f:
+                yaml.dump(data, f, sort_keys=False, default_flow_style=False)
+            self.load()

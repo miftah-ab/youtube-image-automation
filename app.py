@@ -190,17 +190,56 @@ def main():
                 if len(clean_id) >= 32:
                     selected_page_id = clean_id[-32:]
 
-        # Reference Images Check
-        st.markdown("#### Channel Reference Images")
+        # Reference Images Management
+        st.markdown("#### 🎨 Channel Reference Image")
         found_refs, missing_refs = active_channel.check_references()
-        if active_channel.requires_reference:
-            st.warning("This channel requires a reference image for style consistency.")
-        if found_refs:
-            st.success(f"Configured Reference Found: `{found_refs[0].name}`")
-        elif missing_refs and active_channel.requires_reference:
-            st.error(f"Missing Required Reference: `{missing_refs[0]}`. Please place reference in this location.")
-        else:
-            st.info("No reference images required for this channel.")
+        
+        ref_col1, ref_col2 = st.columns([1, 2])
+        with ref_col1:
+            if found_refs and found_refs[0].exists() and found_refs[0].stat().st_size > 100:
+                st.image(str(found_refs[0]), caption=f"Active: {found_refs[0].name}", width=220)
+            elif found_refs:
+                st.info(f"File placeholder exists: `{found_refs[0].name}`")
+            elif missing_refs:
+                st.warning(f"Configured file missing: `{missing_refs[0]}`")
+            else:
+                st.caption("No reference image uploaded yet.")
+
+        with ref_col2:
+            req_toggle = st.checkbox(
+                "Enforce reference image during generation for this channel",
+                value=active_channel.requires_reference,
+                key=f"req_ref_toggle_{active_channel.id}",
+                help="When enabled, Gemini will be seeded with this reference image before generating video scenes.",
+            )
+            if req_toggle != active_channel.requires_reference:
+                registry.set_requires_reference(active_channel.id, req_toggle)
+                st.success(f"Reference enforcement updated to: {req_toggle}")
+                st.rerun()
+
+            uploaded_ref = st.file_uploader(
+                f"Upload reference image for {active_channel.name}",
+                type=["png", "jpg", "jpeg", "webp"],
+                key=f"ref_uploader_{active_channel.id}",
+                help="Upload an approved character model, style frame, or color palette image.",
+            )
+            if uploaded_ref is not None:
+                save_dir = Path("assets/references")
+                save_dir.mkdir(parents=True, exist_ok=True)
+                ext = Path(uploaded_ref.name).suffix.lower() or ".png"
+                target_filename = f"{active_channel.id}_reference{ext}"
+                target_path = save_dir / target_filename
+
+                with open(target_path, "wb") as f:
+                    f.write(uploaded_ref.getbuffer())
+
+                registry.update_reference(
+                    channel_id=active_channel.id,
+                    relative_path=f"assets/references/{target_filename}",
+                    requires_reference=True,
+                )
+                st.success(f"Reference image uploaded and set to `{target_filename}`!")
+                st.rerun()
 
         # Extract Prompts
         st.divider()

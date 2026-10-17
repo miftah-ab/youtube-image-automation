@@ -33,7 +33,6 @@ st.set_page_config(
 )
 
 
-@st.cache_resource
 def get_channel_registry() -> ChannelRegistry:
     return ChannelRegistry(Path("config/channels.yaml"))
 

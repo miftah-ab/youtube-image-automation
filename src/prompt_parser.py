@@ -139,7 +139,6 @@ class PromptParser:
         flattened = []
 
         def _traverse(node_list: List[Dict[str, Any]], current_heading: Optional[str] = None):
-            nonlocal current_heading
             for block in node_list:
                 b_type = block.get("type", "unknown")
                 text_content = self._extract_text_from_block(block)

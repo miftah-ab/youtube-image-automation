@@ -55,4 +55,8 @@ def test_notion_handles_401_auth_error():
         mock_req.return_value = resp
 
         with pytest.raises(PermissionError, match="Authentication Failed"):
-            client.test_connection()
+            client._request("GET", "/users/me")
+
+        ok, msg = client.test_connection()
+        assert ok is False
+        assert "Authentication Failed" in msg

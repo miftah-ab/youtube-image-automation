@@ -146,6 +146,7 @@ class ImageDownloader:
                     temp_path.unlink()
                 except Exception:
                     pass
+                validation.file_path = str(destination)
                 return DownloadResult(
                     success=True,
                     final_path=str(destination),
@@ -165,6 +166,7 @@ class ImageDownloader:
         # Step 5: Atomically promote file
         try:
             shutil.move(str(temp_path), str(destination))
+            validation.file_path = str(destination)
             logger.info(f"Successfully validated and saved image: {destination} ({validation.width}x{validation.height}, {validation.file_size_bytes} bytes)")
             return DownloadResult(
                 success=True,
